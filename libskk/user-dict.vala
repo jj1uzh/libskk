@@ -58,10 +58,10 @@ namespace Skk {
                 }
             }
 
-            Map<string,Gee.List<Candidate>>? entries = null;
+            bool okuri = false;
             while (line != null) {
                 if (line.has_prefix (";; okuri-ari entries.")) {
-                    entries = okuri_ari_entries;
+                    okuri = true;
                     break;
                 }
                 line = data.read_line (out length);
@@ -69,19 +69,17 @@ namespace Skk {
                     break;
                 }
             }
-            if (entries == null) {
+            if (okuri == false) {
                 throw new SkkDictError.MALFORMED_INPUT (
                     "no okuri-ari boundary");
             }
 
-            bool okuri = true;
             while (line != null) {
                 line = data.read_line (out length);
                 if (line == null) {
                     break;
                 }
                 if (line.has_prefix (";; okuri-nasi entries.")) {
-                    entries = okuri_nasi_entries;
                     okuri = false;
                     continue;
                 }
@@ -110,12 +108,21 @@ namespace Skk {
                 var candidates = split_candidates (midasi,
                                                    okuri,
                                                    candidates_str);
-                var list = new ArrayList<Candidate> ();
+                var list = new LinkedList<Candidate> ();
                 foreach (var c in candidates) {
                     list.add (c);
                 }
-                entries.set (midasi, list);
+
+                var new_entry = new UserDictEntry (midasi, list);
+                if (okuri) {
+                    okuri_ari_entries.prepend (new_entry);
+                } else {
+                    okuri_nasi_entries.prepend (new_entry);
+                }
             }
+
+            okuri_ari_entries.reverse ();
+            okuri_nasi_entries.reverse ();
         }
 
         /**
@@ -130,8 +137,8 @@ namespace Skk {
             FileInfo info = file.query_info (attributes,
                                              FileQueryInfoFlags.NONE);
             if (info.get_etag () != etag) {
-                this.okuri_ari_entries.clear ();
-                this.okuri_nasi_entries.clear ();
+                okuri_ari_entries = null;
+                okuri_nasi_entries = null;
                 try {
                     load ();
                 } catch (SkkDictError e) {
@@ -144,27 +151,13 @@ namespace Skk {
             }
         }
 
-        static int compare_entry_asc (Map.Entry<string,Gee.List<Candidate>> a,
-                                      Map.Entry<string,Gee.List<Candidate>> b)
-        {
-            return strcmp (a.key, b.key);
-        }
-
-        static int compare_entry_dsc (Map.Entry<string,Gee.List<Candidate>> a,
-                                      Map.Entry<string,Gee.List<Candidate>> b)
-        {
-            return strcmp (b.key, a.key);
-        }
-
         void write_entries (StringBuilder builder,
-                            Gee.List<Map.Entry<string,Gee.List<Candidate>>> entries)
+                            SList<UserDictEntry> entries)
         {
-            var iter = entries.iterator ();
-            while (iter.next ()) {
-                var entry = iter.get ();
+            foreach (var entry in entries) {
                 var line = "%s %s\n".printf (
-                    entry.key,
-                    join_candidates (entry.value.to_array ()));
+                    entry.midasi,
+                    join_candidates (entry.candidates.to_array ()));
                 builder.append (line);
             }
         }
@@ -180,17 +173,10 @@ namespace Skk {
             }
 
             builder.append (";; okuri-ari entries.\n");
-            var entries = new ArrayList<Map.Entry<string,Gee.List<Candidate>>> ();
-            entries.add_all (okuri_ari_entries.entries);
-            entries.sort ((CompareDataFunc) compare_entry_dsc);
-            write_entries (builder, entries);
-            entries.clear ();
+            write_entries (builder, okuri_ari_entries);
 
             builder.append (";; okuri-nasi entries.\n");
-            entries.add_all (okuri_nasi_entries.entries);
-            entries.sort ((CompareDataFunc) compare_entry_asc);
-            write_entries (builder, entries);
-            entries.clear ();
+            write_entries (builder, okuri_nasi_entries);
 
             var contents = converter.encode (builder.str);
             DirUtils.create_with_parents (Path.get_dirname (file.get_path ()),
@@ -211,24 +197,21 @@ namespace Skk {
 #endif
         }
 
-        Map<string,Gee.List<Candidate>> get_entries (bool okuri = false) {
-            if (okuri) {
-                return okuri_ari_entries;
-            } else {
-                return okuri_nasi_entries;
-            }
-        }
-
         /**
          * {@inheritDoc}
          */
         public override Candidate[] lookup (string midasi, bool okuri = false) {
-            var entries = get_entries (okuri);
-            if (entries.has_key (midasi)) {
-                return entries.get (midasi).to_array ();
-            } else {
-                return new Candidate[0];
-            }
+            // Arrays are not supported as generic type arguments
+            Candidate[] ret = new Candidate[0];
+            with_entries<void> (okuri, (ref entries) => {
+                foreach (var entry in entries) {
+                    if (entry.midasi == midasi) {
+                        ret = entry.candidates.to_array ();
+                        break;
+                    }
+                }
+            });
+            return ret;
         }
 
         /**
@@ -236,32 +219,15 @@ namespace Skk {
          */
         public override string[] complete (string midasi) {
             Gee.List<string> completion = new ArrayList<string> ();
-            Gee.List<string> keys = new ArrayList<string> ();
-            keys.add_all (okuri_nasi_entries.keys);
-            keys.sort ();
-            var iter = keys.iterator ();
-            // find the first matching entry
-            while (iter.next ()) {
-                var key = iter.get ();
-                if (key.has_prefix (midasi)) {
-                    // don't add midasi word itself
-                    if (key != midasi) {
-                        completion.add (key);
-                    }
-                    break;
+
+            foreach (var entry in okuri_nasi_entries) {
+                if (entry.midasi.has_prefix (midasi) &&
+                    entry.midasi != midasi)
+                {
+                    completion.add (entry.midasi);
                 }
             }
-            // loop until the last matching entry
-            while (iter.next ()) {
-                var key = iter.get ();
-                if (!key.has_prefix (midasi)) {
-                    break;
-                }
-                // don't add midasi word itself
-                if (key != midasi) {
-                    completion.add (key);
-                }
-            }
+
             return completion.to_array ();
         }
 
@@ -269,52 +235,43 @@ namespace Skk {
          * {@inheritDoc}
          */
         public override bool select_candidate (Candidate candidate) {
-            var entries = get_entries (candidate.okuri);
-            if (!entries.has_key (candidate.midasi)) {
-                entries.set (candidate.midasi, new ArrayList<Candidate> ());
-            }
-            var index = 0;
-            var candidates = entries.get (candidate.midasi);
-            foreach (var c in candidates) {
-                if (c.text == candidate.text) {
-                    if (index > 0) {
-                        var first = candidates[0];
-                        candidates[0] = candidates[index];
-                        candidates[index] = first;
-                        return true;
+            return with_entries<bool> (candidate.okuri, (ref entries) => {
+                foreach (var entry in entries) {
+                    if (entry.midasi == candidate.midasi) {
+                        var entry_modified = entry.select (candidate);
+                        if (entries.data != entry) {
+                            entries.remove (entry);
+                            entries.prepend (entry);
+                            return true;
+                        }
+                        return entry_modified;
                     }
-                    return false;
                 }
-                index++;
-            }
-            candidates.insert (0, candidate);
-            return true;
+
+                var new_entry = new UserDictEntry.from_candidate (candidate);
+                entries.prepend (new_entry);
+                return true;
+            });
         }
 
         /**
          * {@inheritDoc}
          */
-        public override bool purge_candidate (Candidate candidate)
-        {
-            bool modified = false;
-            var entries = get_entries (candidate.okuri);
-            if (entries.has_key (candidate.midasi)) {
-                var candidates = entries.get (candidate.midasi);
-                if (candidates.size > 0) {
-                    var iter = candidates.iterator ();
-                    while (iter.next ()) {
-                        var c = iter.get ();
-                        if (c.text == candidate.text) {
-                            iter.remove ();
-                            modified = true;
+        public override bool purge_candidate (Candidate candidate) {
+            return with_entries<bool> (candidate.okuri, (ref entries) => {
+                var modified = false;
+
+                foreach (var entry in entries) {
+                    if (entry.midasi == candidate.midasi) {
+                        var purged = entry.purge (candidate);
+                        if (purged && entry.candidates.is_empty) {
+                            entries.remove (entry);
                         }
-                    }
-                    if (candidates.size == 0) {
-                        entries.unset (candidate.midasi);
+                        modified |= purged;
                     }
                 }
-            }
-            return modified;
+                return modified;
+            });
         }
 
         /**
@@ -329,10 +286,28 @@ namespace Skk {
         File file;
         string etag;
         EncodingConverter converter;
-        Map<string,Gee.List<Candidate>> okuri_ari_entries =
-            new HashMap<string,Gee.List<Candidate>> ();
-        Map<string,Gee.List<Candidate>> okuri_nasi_entries =
-            new HashMap<string,Gee.List<Candidate>> ();
+
+        /**
+         * Ordered okuri ari entries;
+         * Head is most recent selected candidate.
+         */
+        SList<UserDictEntry> okuri_ari_entries = null;
+
+        /**
+         * Ordered okuri nasi entries;
+         * Head is most recent selected candidate.
+         */
+        SList<UserDictEntry> okuri_nasi_entries = null;
+
+        delegate T WithEntries<T> (ref SList<UserDictEntry> entries);
+
+        T with_entries<T> (bool okuri, WithEntries<T> f) {
+            if (okuri) {
+                return f (ref okuri_ari_entries);
+            } else {
+                return f (ref okuri_nasi_entries);
+            }
+        }
 
         /**
          * Create a new UserDict.
@@ -356,16 +331,65 @@ namespace Skk {
         }
 
         ~UserDict () {
-            var okuri_ari_iter = okuri_ari_entries.map_iterator ();
-            while (okuri_ari_iter.next ()) {
-                okuri_ari_iter.get_value ().clear ();
+            okuri_ari_entries = null;
+            okuri_nasi_entries = null;
+        }
+    }
+
+    private class UserDictEntry {
+        public string midasi;
+        public LinkedList<Candidate> candidates;
+
+        /**
+         * Select the candidate in this candidates; If this candidates
+         * does not have the candidate at head, bring it to head.
+         *
+         * @return `true` if modified this candidates, `false` otherwise
+         */
+        public bool select (Candidate candidate) {
+            if (!candidates.is_empty
+                && candidates.first ().text == candidate.text) {
+                return false;
             }
-            okuri_ari_entries.clear ();
-            var okuri_nasi_iter = okuri_nasi_entries.map_iterator ();
-            while (okuri_nasi_iter.next ()) {
-                okuri_nasi_iter.get_value ().clear ();
+
+            var iter = candidates.iterator ();
+            while (iter.next ()) {
+                var c = iter.get ();
+                if (c.text == candidate.text) {
+                    iter.remove ();
+                }
             }
-            okuri_nasi_entries.clear ();
+            candidates.insert (0, candidate);
+            return true;
+        }
+
+        /**
+         * Purge the candidate in this candidates.
+         */
+        public bool purge (Candidate candidate) {
+            var purged = false;
+            var iter = candidates.iterator ();
+            while (iter.next ()) {
+                var c = iter.get ();
+                if (c.text == candidate.text) {
+                    iter.remove ();
+                    purged = true;
+                }
+            }
+            return purged;
+        }
+
+        public UserDictEntry (string midasi,
+                              LinkedList<Candidate> candidates)
+        {
+            this.midasi = midasi;
+            this.candidates = candidates;
+        }
+
+        public UserDictEntry.from_candidate (Candidate candidate) {
+            this.midasi = candidate.midasi;
+            this.candidates = new LinkedList<Candidate> ();
+            this.candidates.add (candidate);
         }
     }
 }
