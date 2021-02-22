@@ -76,6 +76,7 @@ libskk_la_SOURCES =				\
 	expr.vala				\
 	util.vala				\
 	keysyms.vala				\
+	completer.vala				\
 	$(NULL)
 
 if HAVE_INTROSPECTION

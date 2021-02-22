@@ -73,9 +73,7 @@ namespace Skk {
         internal StringBuilder abbrev = new StringBuilder ();
         internal StringBuilder kuten = new StringBuilder ();
 
-        ArrayList<string> completion = new ArrayList<string> ();
-        internal BidirListIterator<string> completion_iterator;
-        internal Set<string> completion_set = new HashSet<string> ();
+        internal Completer completer;
 
         internal string[] auto_start_henkan_keywords;
         internal string? auto_start_henkan_keyword = null;
@@ -136,6 +134,7 @@ namespace Skk {
             this.dictionaries = dictionaries;
             this.candidates = new SimpleCandidateList ();
             this.candidates.selected.connect (candidate_selected);
+            this.completer = new Completer ();
 
             rom_kana_converter = new RomKanaConverter ();
             okuri_rom_kana_converter = new RomKanaConverter ();
@@ -192,9 +191,7 @@ namespace Skk {
             okuri_rom_kana_converter.reset ();
             okuri = false;
             _typing_rule.get_filter ().reset ();
-            completion_iterator = null;
-            completion_set.clear ();
-            completion.clear ();
+            completer.clear ();
             candidates.clear ();
             abbrev.erase ();
             kuten.erase ();
@@ -347,22 +344,6 @@ namespace Skk {
                 if (!dict.read_only) {
                     dict.purge_candidate (candidate);
                 }
-            }
-        }
-
-        internal void completion_start (string midasi) {
-            foreach (var dict in dictionaries) {
-                string[] _completion = dict.complete (midasi);
-                foreach (var word in _completion) {
-                    if (completion_set.add (word)) {
-                        completion.add (word);
-                    }
-                }
-                completion.sort ();
-            }
-            completion_iterator = completion.bidir_list_iterator ();
-            if (!completion_iterator.first ()) {
-                completion_iterator = null;
             }
         }
 
@@ -739,16 +720,15 @@ namespace Skk {
                 return true;
             }
             else if (command == "complete") {
-                if (state.completion_iterator == null) {
-                    state.completion_start (state.abbrev.str);
+                if (!state.completer.is_initialized) {
+                    state.completer.init (state.abbrev.str,
+                                          state.dictionaries);
                 }
-                if (state.completion_iterator != null) {
-                    string midasi = state.completion_iterator.get ();
-                    state.abbrev.assign (midasi);
-                    if (state.completion_iterator.has_next ()) {
-                        state.completion_iterator.next ();
-                    }
+                var next_completion = state.completer.next ();
+                if (next_completion != null) {
+                    state.abbrev.assign (next_completion);
                 }
+                return true;
             }
             else if (key.modifiers == 0 &&
                      0x20 <= key.code && key.code <= 0x7E) {
@@ -858,16 +838,14 @@ namespace Skk {
                 return true;
             }
             else if (command == "complete") {
-                if (state.completion_iterator == null) {
-                    state.completion_start (state.rom_kana_converter.output);
+                if (!state.completer.is_initialized) {
+                    state.completer.init (state.rom_kana_converter.output,
+                                          state.dictionaries);
                 }
-                if (state.completion_iterator != null) {
-                    string midasi = state.completion_iterator.get ();
+                var next_completion = state.completer.next ();
+                if (next_completion != null) {
                     state.rom_kana_converter.reset ();
-                    state.rom_kana_converter.output = midasi;
-                    if (state.completion_iterator.has_next ()) {
-                        state.completion_iterator.next ();
-                    }
+                    state.rom_kana_converter.output = next_completion;
                 }
                 return true;
             }
