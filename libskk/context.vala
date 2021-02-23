@@ -121,6 +121,10 @@ namespace Skk {
             }
         }
 
+        public CompletionList completions {
+            get; private set; default = null;
+        }
+
         LinkedList<State> state_stack = new LinkedList<State> ();
         Gee.Map<Type, StateHandler> handlers =
             new HashMap<Type, StateHandler> ();
@@ -229,6 +233,7 @@ namespace Skk {
                           new KutenStateHandler ());
             var state = new State (_dictionaries);
             _candidates = new ProxyCandidateList (state.candidates);
+            completions = new CompletionList (state.completer);
             push_state (state);
             _candidates.notify["cursor-pos"].connect (() => {
                     if (_candidates.cursor_pos >= 0) {

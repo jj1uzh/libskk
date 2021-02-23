@@ -1,3 +1,4 @@
+// todo: change file name to completion.vala
 using Gee;
 
 namespace Skk {
@@ -5,11 +6,20 @@ namespace Skk {
     class Completer : Object {
 
         unowned Gee.List<Dict> dicts;
-        CompletionState state = CompletionState.Uninitialized;
         string midasi;
-        int index = -1;
-        Gee.List<string> completions = new ArrayList<string> ();
+        internal CompletionState state {
+            get; private set; default = CompletionState.Uninitialized;
+        }
+        internal int index {
+            get; private set; default = -1;
+        }
+        internal Gee.List<string> completions {
+            get; private set; default = new ArrayList<string> ();
+        }
         Gee.Set<string> completion_set = new HashSet<string> ();
+
+        internal signal void expanded ();
+        internal signal void cleared ();
 
         void clear_if_initialized () {
             if (state.is_initialized ())
@@ -23,6 +33,7 @@ namespace Skk {
             index = -1;
             completions.clear ();
             completion_set.clear ();
+            cleared ();
         }
 
         [CCode (type="inline")]
@@ -57,18 +68,17 @@ namespace Skk {
 
         void expand_completion () {
             switch (state) {
+            case CompletionState.Full:
+                break;
             case CompletionState.Uninitialized:
                 complete_with_user_dicts ();
                 state = CompletionState.UserDictOnly;
-                if (completions.size <= 0) {
-                    expand_completion ();
-                }
+                expanded ();
                 break;
             case CompletionState.UserDictOnly:
                 complete_with_non_user_dicts ();
                 state = CompletionState.Full;
-                break;
-            case CompletionState.Full:
+                expanded ();
                 break;
             }
         }
@@ -115,16 +125,62 @@ namespace Skk {
 
         internal Completer () {}
 
-        enum CompletionState {
+        internal enum CompletionState {
             Uninitialized, UserDictOnly, Full;
 
-            public bool is_initialized () {
+            internal bool is_initialized () {
                 return this != Uninitialized;
             }
 
-            public bool is_expandable () {
+            internal bool is_expandable () {
                 return this != Full;
             }
+        }
+    }
+
+    public class CompletionList : Object {
+
+        Completer completer;
+
+        public int total_size {
+            get {
+                if (completer.state.is_expandable ())
+                    return -1;
+                else
+                    return completer.completions.size;
+            }
+        }
+
+        public int current_size {
+            get {
+                return completer.completions.size;
+            }
+        }
+
+        public new string @get (int i) {
+            return completer.completions[i];
+        }
+
+        public int cursor_pos {
+            get{
+                return completer.index;
+            }
+        }
+
+        public signal void expanded ();
+        void send_expanded () { expanded (); }
+
+        public signal void index_moved ();
+        void send_index_moved () { index_moved (); }
+
+        public signal void cleared ();
+        void send_cleared () { cleared (); }
+
+        internal CompletionList (Completer completer) {
+            this.completer = completer;
+            completer.expanded.connect (send_expanded);
+            completer.notify["index"].connect (send_index_moved);
+            completer.cleared.connect (send_cleared);
         }
     }
 }
