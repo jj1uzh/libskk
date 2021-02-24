@@ -678,6 +678,13 @@ namespace Skk {
                                                   ref KeyEvent key)
         {
             var command = state.lookup_key (key);
+
+            if (command != "complete" &&
+                command != "next-completion" &&
+                command != "previous-completion") {
+                    state.completer.clear_if_initialized ();
+                }
+
             if (command == "abort" ||
                 command == "abort-to-latin" ||
                 command == "abort-to-latin-unhandled") {
@@ -807,6 +814,12 @@ namespace Skk {
                     return true;
                 }
             }
+
+            if (command != "complete" &&
+                command != "next-completion" &&
+                command != "previous-completion") {
+                    state.completer.clear_if_initialized ();
+                }
 
             if (command == "next-candidate") {
                 if (state.rom_kana_converter.output.length == 0) {

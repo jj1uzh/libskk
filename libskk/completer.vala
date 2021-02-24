@@ -21,7 +21,7 @@ namespace Skk {
         internal signal void expanded ();
         internal signal void cleared ();
 
-        void clear_if_initialized () {
+        internal void clear_if_initialized () {
             if (state.is_initialized ())
                 clear ();
         }
