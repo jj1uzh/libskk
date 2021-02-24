@@ -724,11 +724,31 @@ namespace Skk {
                     state.completer.init (state.abbrev.str,
                                           state.dictionaries);
                 }
-                var next_completion = state.completer.next ();
-                if (next_completion != null) {
-                    state.abbrev.assign (next_completion);
+                if (state.completer.is_initialized) {
+                    var next = state.completer.next ();
+                    if (next != null) {
+                        state.abbrev.assign (next);
+                    }
                 }
                 return true;
+            }
+            else if (command == "next-completion") {
+                if (state.completer.is_initialized) {
+                    var next = state.completer.next ();
+                    if (next != null) {
+                        state.abbrev.assign (next);
+                    }
+                    return true;
+                }
+            }
+            else if (command == "previous-completion") {
+                if (state.completer.is_initialized) {
+                    var prev = state.completer.previous ();
+                    if (prev != null) {
+                        state.abbrev.assign (prev);
+                    }
+                    return true;
+                }
             }
             else if (key.modifiers == 0 &&
                      0x20 <= key.code && key.code <= 0x7E) {
@@ -842,12 +862,35 @@ namespace Skk {
                     state.completer.init (state.rom_kana_converter.output,
                                           state.dictionaries);
                 }
-                var next_completion = state.completer.next ();
-                if (next_completion != null) {
-                    state.rom_kana_converter.reset ();
-                    state.rom_kana_converter.output = next_completion;
+                if (state.completer.is_initialized) {
+                    var next_completion = state.completer.next ();
+                    if (next_completion != null) {
+                        state.rom_kana_converter.reset ();
+                        state.rom_kana_converter.output = next_completion;
+                    }
                 }
                 return true;
+            }
+            else if (command == "next-completion") {
+                // todo: make subroutine?
+                if (state.completer.is_initialized) {
+                    var next = state.completer.next ();
+                    if (next != null) {
+                        state.rom_kana_converter.reset ();
+                        state.rom_kana_converter.output = next;
+                    }
+                    return true;
+                }
+            }
+            else if (command == "previous-completion") {
+                if (state.completer.is_initialized) {
+                    var prev = state.completer.previous ();
+                    if (prev != null) {
+                        state.rom_kana_converter.reset ();
+                        state.rom_kana_converter.output = prev;
+                    }
+                    return true;
+                }
             }
             else if (command == "special-midasi") {
                 if (state.rom_kana_converter.output.length > 0) {

@@ -111,17 +111,15 @@ namespace Skk {
             }
         }
 
-        /* not used yet
-           internal string? previous () {
+        internal string? previous () {
            var new_idx = index - 1;
            if (new_idx >= 0) {
-           index = new_idx;
-           return completions[index];
+               index = new_idx;
+               return completions[index];
            } else {
-           return null;
+               return null;
            }
-           }
-        */
+        }
 
         internal Completer () {}
 
