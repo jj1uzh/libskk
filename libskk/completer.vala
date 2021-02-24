@@ -37,18 +37,38 @@ namespace Skk {
         }
 
         [CCode (type="inline")]
-        void add_completion (string candidate) {
+        bool add_completion (string candidate) {
             if (completion_set.add (candidate)) {
                 completions.add (candidate);
+                return true;
+            } else {
+                return false;
             }
         }
 
-        void complete_with_user_dicts () {
+        bool complete_with_user_dicts () {
+            var actually_expanded = false;
             foreach (var dict in dicts) {
                 if (! (dict is UserDict)) continue;
                 foreach (var candidate in dict.complete (midasi)) {
-                    add_completion (candidate);
+                    actually_expanded |= add_completion (candidate);
                 }
+            }
+            return actually_expanded;
+        }
+
+        void complete_with_user_dicts_with_limit (int size) {
+            var cur_size = 0;
+            foreach (var dict in dicts) {
+                if (! (dict is UserDict)) continue;
+                var userdict = dict as UserDict;
+                var candidates = userdict.complete_with_limit (midasi, 
+                                                               size - cur_size);
+                foreach (var candidate in candidates) {
+                    if (add_completion (candidate))
+                        cur_size += 1;
+                }
+                if (cur_size >= size) return;
             }
         }
 
@@ -68,12 +88,16 @@ namespace Skk {
 
         void expand_completion () {
             switch (state) {
-            case CompletionState.Full:
+            case CompletionState.Full, CompletionState.Uninitialized:
                 break;
-            case CompletionState.Uninitialized:
-                complete_with_user_dicts ();
+            case CompletionState.None, CompletionState.UserDictWithLimit:
+                var actually_expanded = complete_with_user_dicts ();
                 state = CompletionState.UserDictOnly;
-                expanded ();
+                if (!actually_expanded) {
+                    expand_completion ();
+                } else {
+                    expanded ();
+                }
                 break;
             case CompletionState.UserDictOnly:
                 complete_with_non_user_dicts ();
@@ -94,7 +118,18 @@ namespace Skk {
 
             this.dicts = dicts;
             this.midasi = midasi;
-            expand_completion ();
+            this.state = CompletionState.None;
+        }
+
+        internal void init_with_limited_expansion (string midasi,
+                                                   Gee.List<Dict> dicts,
+                                                   int size)
+        {
+            init (midasi, dicts);
+            complete_with_user_dicts_with_limit (size);
+            expanded ();
+            state = CompletionState.UserDictWithLimit;
+            warning ("dcomp");
         }
 
         internal string? next () {
@@ -124,7 +159,7 @@ namespace Skk {
         internal Completer () {}
 
         internal enum CompletionState {
-            Uninitialized, UserDictOnly, Full;
+            Uninitialized, None, UserDictWithLimit, UserDictOnly, Full;
 
             internal bool is_initialized () {
                 return this != Uninitialized;

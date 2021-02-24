@@ -265,6 +265,41 @@ namespace Skk {
             return completion.to_array ();
         }
 
+        public string[] complete_with_limit (string midasi, int size) {
+            var cur_size = 0;
+            Gee.List<string> completion = new ArrayList<string> ();
+            if (cur_size >= size) return completion.to_array ();
+            Gee.List<string> keys = new ArrayList<string> ();
+            keys.add_all (okuri_nasi_entries.keys);
+            keys.sort ();
+            var iter = keys.iterator ();
+            // find the first matching entry
+            while (iter.next ()) {
+                var key = iter.get ();
+                if (key.has_prefix (midasi)) {
+                    // don't add midasi word itself
+                    if (key != midasi) {
+                        completion.add (key);
+                        cur_size += 1;
+                    }
+                    break;
+                }
+            }
+            // loop until the last matching entry
+            while (iter.next ()) {
+                if (cur_size >= size) return completion.to_array ();
+                var key = iter.get ();
+                if (!key.has_prefix (midasi)) {
+                    break;
+                }
+                // don't add midasi word itself
+                if (key != midasi) {
+                    completion.add (key);
+                    cur_size += 1;
+                }
+            }
+            return completion.to_array ();
+        }
         /**
          * {@inheritDoc}
          */

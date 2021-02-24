@@ -705,6 +705,11 @@ namespace Skk {
             else if (command == "delete") {
                 if (state.abbrev.len > 0) {
                     state.abbrev.truncate (state.abbrev.len - 1);
+                    state.completer.init_with_limited_expansion (
+                        state.abbrev.str,
+                        state.dictionaries,
+                        4
+                    );
                 } else {
                     state.reset ();
                 }
@@ -760,6 +765,11 @@ namespace Skk {
             else if (key.modifiers == 0 &&
                      0x20 <= key.code && key.code <= 0x7E) {
                 state.abbrev.append_unichar (key.code);
+                state.completer.init_with_limited_expansion (
+                    state.abbrev.str,
+                    state.dictionaries,
+                    4
+                );
                 return true;
             }
             return true;
@@ -856,9 +866,19 @@ namespace Skk {
                     if (state.okuri_rom_kana_converter.preedit.length == 0) {
                         state.okuri = false;
                     }
+                    state.completer.init_with_limited_expansion (
+                        state.rom_kana_converter.output,
+                        state.dictionaries,
+                        4
+                    );
                     return true;
                 }
                 else if (state.rom_kana_converter.delete ()) {
+                    state.completer.init_with_limited_expansion (
+                        state.rom_kana_converter.output,
+                        state.dictionaries,
+                        4
+                    );
                     return true;
                 }
                 else if (state.output.len > 0) {
@@ -1002,6 +1022,11 @@ namespace Skk {
                         key = state.where_is ("next-candidate");
                         return false;
                     }
+                    state.completer.init_with_limited_expansion (
+                        state.rom_kana_converter.output,
+                        state.dictionaries,
+                        4
+                    );
                     return true;
                 }
             }
