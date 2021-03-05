@@ -144,7 +144,6 @@ namespace Skk {
             complete_with_user_dicts_with_limit (size);
             expanded ();
             state = CompletionState.UserDictWithLimit;
-            warning ("dcomp");
         }
 
         internal string? next () {
