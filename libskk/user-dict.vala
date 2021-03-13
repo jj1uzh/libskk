@@ -114,10 +114,11 @@ namespace Skk {
                 foreach (var c in candidates) {
                     list.add (c);
                 }
-                entries.set (midasi, list);
 
-                if (!okuri)
+                if (!okuri && entries.has_key (midasi))
                     okuri_nasi_midasi_list.prepend (midasi);
+
+                entries.set (midasi, list);
             }
             okuri_nasi_midasi_list.reverse ();
         }
@@ -162,7 +163,7 @@ namespace Skk {
         }
 
         void write_okuri_ari_entries (StringBuilder builder) {
-            foreach (var entry in okuri_nasi_entries) {
+            foreach (var entry in okuri_ari_entries) {
                 var line = "%s %s\n".printf (
                     entry.key,
                     join_candidates (entry.value.to_array ()));
