@@ -115,7 +115,7 @@ namespace Skk {
                     list.add (c);
                 }
 
-                if (!okuri && entries.has_key (midasi))
+                if (!okuri && !entries.has_key (midasi))
                     okuri_nasi_midasi_list.prepend (midasi);
 
                 entries.set (midasi, list);
@@ -263,15 +263,19 @@ namespace Skk {
          */
         public override bool select_candidate (Candidate candidate) {
             var entries = get_entries (candidate.okuri);
+
+            if (!candidate.okuri) {
+                if (entries.has_key (candidate.midasi))
+                    okuri_nasi_midasi_list.remove (candidate.midasi);
+
+                okuri_nasi_midasi_list.prepend (candidate.midasi);
+            }
+
             if (!entries.has_key (candidate.midasi)) {
                 entries.set (candidate.midasi, new ArrayList<Candidate> ());
             }
             var index = 0;
             var candidates = entries.get (candidate.midasi);
-            if (!candidate.okuri && candidates != null) {
-                okuri_nasi_midasi_list.remove (candidate.midasi);
-                okuri_nasi_midasi_list.prepend (candidate.midasi);
-            }
             foreach (var c in candidates) {
                 if (c.text == candidate.text) {
                     if (index > 0) {
