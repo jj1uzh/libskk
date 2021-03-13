@@ -811,6 +811,15 @@ namespace Skk {
             foreach (var entry in end_preedit_commands) {
                 if (entry.key == command) {
                     state.rom_kana_converter.output_nn_if_any ();
+
+                    var midasi = state.rom_kana_converter.output;
+                    var cand = new Candidate (midasi, false, "");
+                    foreach (var dict in state.dictionaries) {
+                        if (!dict.read_only &&
+                            dict.select_candidate (cand)) {
+                        }
+                    }
+
                     state.output.append (
                         Util.convert_by_input_mode (
                             state.rom_kana_converter.output,
